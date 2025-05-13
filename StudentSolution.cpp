@@ -78,10 +78,20 @@ void solveProblems(AcequiaManager& manager)
 //		manager.nexthour();
 //	}
 //}
+Canal* getCanal(Region* source, Region* destination, AcequiaManager &manager){
+	auto canals = manager.getCanals();
+	for(auto canal : canals){
+		if( canal->sourceRegion == source && canal->destinationRegion == destination){
+			return canal;
+		}
+	}	
+	return nullptr;
+}
 
 void solveProblems(AcequiaManager& manager)
 {
 	auto canals = manager.getCanals();
+	std::vector<Region*> regions = manager.getRegions();
 	//creating named references for each canal since there are only 4
 	//and referencing them with canal[0/1/2/3] gets confusing
 	Canal* NtS = canals[0]; 
@@ -91,94 +101,59 @@ void solveProblems(AcequiaManager& manager)
 	//also creating named references for each region
 	//for the same reason as canals
 	Region* North = canals[0]->sourceRegion;
-	Region* South = canals[1]->destinationRegion;
+	Region* South = canals[1]->sourceRegion;
 	Region* East = canals[2]->destinationRegion;
 
-	//begin by analyzing water data
-	//these variables will help decide how we want to solve the problem
-	double totalNeed = North->waterNeed + South->waterNeed + East->waterNeed;
-	double totalWater = North->waterLevel + South->waterLevel + East->waterLevel;
-	double totalCapacity = North->waterCapacity + South->waterCapacity + East->waterCapacity;
-	
 	while (!manager.isSolved && manager.hour != manager.SimulationMax)
 	{
-		//Students will implement this function to solve the probelms
-		//Example: Adjust canal flow rates and directions
-		
+			std::cout << "HOUR " << manager.hour << ": ";
+			for (Region* region : regions)
+				std::cout << region->name << " = " << region->waterLevel << " Drought: " << region->isInDrought << ", " ;
+			std::cout << std::endl;
 
-		if (totalWater > totalCapacity)
+		int closedCanals = 0;
+		for (int i = 0; i < canals.size(); ++i)
 		{
-			//there is too much available water and at least 1 region will be flooded
-			//in this scenario, we have decided to sacrifice 1 region for the greater good
-			//might be a PR nightmare, but surely the excuse of "The engineering students
-			//needed as many points as possible" will resonate well with the people
-
-			//region 2 (East) because it has 2 canals going in, and 1 going out
-
-			//water need will be checked afterwards. If there is not enough, water will be pulled in
-			//from the east region. Since there is an excess, we are guaranteed to be able to meet the needs
-
-			if (North->waterNeed > North->waterLevel && South->waterNeed > South->waterLevel)
+			//General solution that doesn't involve a bajillion if statements
+			//always flow water if the source region has more than its need
+			//but only flow in ONE direction (never use NtE)
+			Region * sourceRegion = canals[i]->sourceRegion;
+			Region * destinationRegion = canals[i]->destinationRegion;
+			if (sourceRegion->waterLevel > sourceRegion->waterNeed and canals[i] != NtE)
 			{
-				//both regions need water. Adjust flow rate so they fill at different speeds.
-			}
-			if (North->waterNeed > North->waterLevel && South->waterNeed <= South->waterLevel)
-			{
-				//close canal to south, and only flow into north
-			}
-			if (North->waterNeed <= North->waterLevel && South->waterNeed > South->waterLevel)
-			{
-				//open both canals at the same rate (1 is probably best). This will have a net change of 0 on the north region
-			}
-			if (North->waterNeed <= North->waterLevel && South->waterNeed <= South->waterLevel)
-			{
-				//both regions have enough water and the simulation can end.
-			}
+				//flow rate may need to be adjusted to ensure that more than the excess is not given away
+				double excess = sourceRegion->waterLevel - sourceRegion->waterNeed;
+				//flow rate of 1 gives out 3.6 gallons of water per iteration
+				//so if there is less than 3.6, we don't want to give away more than what exists;
+				if(excess < 3.6)
+				{
+					
+					//canals[i]->setFlowRate((3.6-excess)/3.6);
+					//0.00000001 is subtracted to prevent a floating point precision error
+					//error causes the level to be slightly less than the need in some scenarios
+					//even if the numbers are displayed being the same.
+					canals[i]->setFlowRate((excess/3.6) - 0.00000001);
 
-		}
-
-		else if (totalWater < totalCapacity * 0.2)
-		{
-			//there is not enough water available and at least 1 region will be in drought
-			//like before, 1 region will be sacrificed. sacrificed region should be 
-
-			//the region sacrificed should be the one that needs the most water to not be droughted, 
-			//so that we are more likely to be able to meet the needs of 2 regions instead of only 1
-
-			//water need of undroughted regions will be checked afterwards
-			//ideally, we can meet the needs of those regions since the other region gets no water.
-			if (North->waterCapacity > South->waterCapacity && North->waterCapacity > East->waterCapacity)
-			{
-				//north requires the most water and is the best region to dry out
-			}
-			else if (South->waterCapacity > North->waterCapacity && South->waterCapacity > East->waterCapacity)
-			{
-
-			}
-
-		}
-
-		else
-		{
-			//there is enough water to ensure that no region is droughted or flooded
-			//however, we still need to check if we can meet the needs of all regions
-			if (totalNeed <= totalWater)
-			{
-				//there is enough water for everyone! now we just need to figure out
-				//how to distribute it so everyone is happy.
+				}
+				else
+					canals[i]->setFlowRate(1);
+				canals[i]->toggleOpen(true);
 			}
 			else
 			{
-				//the water should be distributed in order of who needs the least amount of water first
-				//this way, we ware more likely to be able to meet the needs of at least 2 regions
+				//ensure that anything below its need is never giving away water.
+				canals[i]->toggleOpen(false);
+				closedCanals += 1;
+			}
+			if (closedCanals == 4)
+			{
+				std::cout << "There is a severe drought and thus not enough water for every region. Ending simulation" << std::endl;
+				while( manager.hour != manager.SimulationMax - 1)
+				{
+					manager.nexthour();
+				}
 			}
 		}
-
-
-		//student may add any necessary functions or check on the progress of each region as the simulation moves forward. 
-		//The manager takes care of updating the waterLevels of each region and waterSource while the student is just expected
-		//to solve how to address the state of each region
-
 
 		manager.nexthour();
 	}
@@ -296,3 +271,12 @@ void solveProblems(AcequiaManager& manager)
 	}
 }
 */
+
+void DroughtFunction()
+{
+	std::cout << "Whoops, this isn't implemented." << std::endl;
+}
+void MiddleFunction()
+{
+	std::cout << "Whoops, this isn't implemented." << std::endl;
+}
