@@ -167,11 +167,17 @@ void solveProblems(AcequiaManager& manager)
 					surpluses.push_back({r, gap});}
   				}
 				std::cerr << "[DEBUG] Total deficits=" << deficits.size() << ", surpluses=" << surpluses.size() << std::endl;
+				
+			//If we want to optimize this more, we can add an if statement to this to allow us to swap to a reverse of the list, 
+			// where we solve from smallest deficit to largest
 
+			
+			//This solves piping from highest surplus to lowest deficet
 				for (auto& d : deficits) {
     				for (auto& s : surpluses) {
       					auto* canal = getCanal(s.ptr, d.ptr, manager);
-      					if (!canal){
+      					//This catches the exception of no direct path
+					if (!canal){
 							std::cerr << "[DEBUG] No direct canal from " << s.ptr->name << " to " << d.ptr->name << ". Using fallback." << std::endl;
 							if(s.ptr->name == "South"){
 								std::cerr << "[DEBUG] Fallback: south drains via StE and EtN." << std::endl;
@@ -212,6 +218,8 @@ void solveProblems(AcequiaManager& manager)
 							}
 							continue;
 	  					}
+						//if there is a direct path, slows the flow out to avoid accidental sacrificing of districts.
+						//this could be optimized to allow for more percie flow control
 						std::cerr << "[DEBUG] Direct canal from " << s.ptr->name << " to " << d.ptr->name << " opened at rate=1.0." << std::endl;
 						if(s.gap < -3.6){
 						canal->setFlowRate(1.0);
